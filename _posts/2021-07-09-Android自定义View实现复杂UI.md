@@ -15,7 +15,9 @@ typora-root-url: ..
 [https://github.com/DaLeiGe/AndroidSamples/tree/master/ProgressView](https://github.com/DaLeiGe/AndroidSamples/tree/master/ProgressView)
 
 ![升高温度](https://upload-images.jianshu.io/upload_images/7312294-fb47c26560a3bcf2.gif?)
+
 ![绿色环倒计时](https://upload-images.jianshu.io/upload_images/7312294-ae2b02797d833ace.gif?imageMogr2/auto-orient/strip)
+
 ![1595899207(1).jpg](https://upload-images.jianshu.io/upload_images/7312294-3bae20a83533965b.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
 #### 1.2、从功能上分析一下这个控件，大致有以下特点
 - 随机运动粒子从圆周向圆心运动，并与切线方向有正负30°的角度差，粒子透明度、半径、运动速度随机，运动超过一定距离或者时间消失
