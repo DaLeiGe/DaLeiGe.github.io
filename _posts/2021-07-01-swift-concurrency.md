@@ -2,8 +2,8 @@
 layout: post
 title: "Swift 并发初步"
 date: 2021-07-01 11:00:00.000000000 +09:00
-categories: [能工巧匠集, Swift]
-tags: [swift, 编程语言, 并发]
+categories: [Android]
+tags: [Android]
 typora-root-url: ..
 ---
 

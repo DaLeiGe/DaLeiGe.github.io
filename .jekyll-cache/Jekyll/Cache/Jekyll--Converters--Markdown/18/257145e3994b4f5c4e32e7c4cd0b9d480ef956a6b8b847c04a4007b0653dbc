@@ -1,0 +1,655 @@
+I"��<meta name="referrer" content="no-referrer" />
+
+<h2 id="一背景">一、背景</h2>
+<h4 id="11控件效果">1.1、控件效果</h4>
+<p>要实现的自定义控件效果大致如下，实现过程中用到了比较多的自定义View的API，觉得比较有代表性，就分享出来也当做学习总结
+项目代码已上传github
+<a href="https://github.com/DaLeiGe/AndroidSamples/tree/master/ProgressView">https://github.com/DaLeiGe/AndroidSamples/tree/master/ProgressView</a></p>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/7312294-fb47c26560a3bcf2.gif?" alt="升高温度" />
+<img src="https://upload-images.jianshu.io/upload_images/7312294-ae2b02797d833ace.gif?imageMogr2/auto-orient/strip" alt="绿色环倒计时" />
+<img src="https://upload-images.jianshu.io/upload_images/7312294-3bae20a83533965b.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="1595899207(1).jpg" /></p>
+<h4 id="12从功能上分析一下这个控件大致有以下特点">1.2、从功能上分析一下这个控件，大致有以下特点</h4>
+<ul>
+  <li>随机运动粒子从圆周向圆心运动，并与切线方向有正负30°的角度差，粒子透明度、半径、运动速度随机，运动超过一定距离或者时间消失</li>
+  <li>背景圆有一个从内到外的渐变色</li>
+  <li>计时模式下圆环有一个颜色渐变的顺时针rotate动画</li>
+  <li>整个背景圆颜色随着扇形角度变化而变化</li>
+  <li>指针颜色变化</li>
+  <li>数字变化是上下切换动画</li>
+</ul>
+
+<h4 id="13从结构上分析">1.3、从结构上分析</h4>
+<p>这个控件可以拆分为两个部分，由背景圆+数字控件两个部分构成的组合控件，之所以把数字控件单独拆分出来，也是为了方便做数字上下跳动的动画，毕竟通过控制drawText的位置实现动画感觉不方便，直接通过View的属性动画更好实现</p>
+
+<p><img src="https://upload-images.jianshu.io/upload_images/7312294-3c8429b3b210b8d7.jpg?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="未命名表单.jpg" /></p>
+
+<h2 id="二-背景圆实现">二、 背景圆实现</h2>
+<h4 id="21实现粒子运动">2.1、实现粒子运动</h4>
+<p>使用AnimPoint.java表示运动粒子，它具有x,y坐标，半径，角度，运动速度，透明度等属性，通过这些属性就可以画出一个静态的粒子</p>
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><!-- <td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+</pre></td> --><td class="rouge-code"><pre><span class="kd">public</span> <span class="kd">class</span> <span class="nc">AnimPoint</span> <span class="kd">implements</span> <span class="nc">Cloneable</span> <span class="o">{</span>
+    <span class="cm">/**
+     * 粒子原点x坐标
+     */</span>
+    <span class="kd">private</span> <span class="kt">float</span> <span class="n">mX</span><span class="o">;</span>
+    <span class="cm">/**
+     * 粒子原点y坐标
+     */</span>
+    <span class="kd">private</span> <span class="kt">float</span> <span class="n">mY</span><span class="o">;</span>
+    <span class="cm">/**
+     * 粒子半径
+     */</span>
+    <span class="kd">private</span> <span class="kt">float</span> <span class="n">radius</span><span class="o">;</span>
+    <span class="cm">/**
+     * 粒子初始位置的角度
+     */</span>
+    <span class="kd">private</span> <span class="kt">double</span> <span class="n">anger</span><span class="o">;</span>
+    <span class="cm">/**
+     * 一帧移动的速度
+     */</span>
+    <span class="kd">private</span> <span class="kt">float</span> <span class="n">velocity</span><span class="o">;</span>
+    <span class="cm">/**
+     * 总共移动的帧数
+     */</span>
+    <span class="kd">private</span> <span class="kt">int</span> <span class="n">num</span> <span class="o">=</span> <span class="mi">0</span><span class="o">;</span>
+
+    <span class="cm">/**
+     * 透明度 0~255
+     */</span>
+    <span class="kd">private</span> <span class="kt">int</span> <span class="n">alpha</span> <span class="o">=</span> <span class="mi">153</span><span class="o">;</span>
+
+    <span class="cm">/**
+     * 随机偏移角度
+     */</span>
+    <span class="kd">private</span> <span class="kt">double</span> <span class="n">randomAnger</span> <span class="o">=</span> <span class="mi">0</span><span class="o">;</span>
+<span class="o">}</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+<p>粒子的初始位置位于随机角度的圆周，且一个粒子具有随机的半径，透明度，速度等，通过init()方法，实现初始化粒子如下</p>
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><!-- <td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+</pre></td> --><td class="rouge-code"><pre><span class="kd">public</span> <span class="kt">void</span> <span class="nf">init</span><span class="o">(</span><span class="nc">Random</span> <span class="n">random</span><span class="o">,</span> <span class="kt">float</span> <span class="n">viewRadius</span><span class="o">)</span> <span class="o">{</span>
+        <span class="n">anger</span> <span class="o">=</span> <span class="nc">Math</span><span class="o">.</span><span class="na">toRadians</span><span class="o">(</span><span class="n">random</span><span class="o">.</span><span class="na">nextInt</span><span class="o">(</span><span class="mi">360</span><span class="o">));</span>
+        <span class="n">velocity</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="na">nextFloat</span><span class="o">()</span> <span class="o">*</span> <span class="mi">2</span><span class="no">F</span><span class="o">;</span>
+        <span class="n">radius</span> <span class="o">=</span> <span class="n">random</span><span class="o">.</span><span class="na">nextInt</span><span class="o">(</span><span class="mi">6</span><span class="o">)</span> <span class="o">+</span> <span class="mi">5</span><span class="o">;</span>
+        <span class="n">mX</span> <span class="o">=</span> <span class="o">(</span><span class="kt">float</span><span class="o">)</span> <span class="o">(</span><span class="n">viewRadius</span> <span class="o">*</span> <span class="nc">Math</span><span class="o">.</span><span class="na">cos</span><span class="o">(</span><span class="n">anger</span><span class="o">));</span>
+        <span class="n">mY</span> <span class="o">=</span> <span class="o">(</span><span class="kt">float</span><span class="o">)</span> <span class="o">(</span><span class="n">viewRadius</span> <span class="o">*</span> <span class="nc">Math</span><span class="o">.</span><span class="na">sin</span><span class="o">(</span><span class="n">anger</span><span class="o">));</span>
+        <span class="c1">//随机偏移角度-30°~30°</span>
+        <span class="n">randomAnger</span> <span class="o">=</span> <span class="nc">Math</span><span class="o">.</span><span class="na">toRadians</span><span class="o">(</span><span class="mi">30</span> <span class="o">-</span> <span class="n">random</span><span class="o">.</span><span class="na">nextInt</span><span class="o">(</span><span class="mi">60</span><span class="o">));</span>
+        <span class="n">alpha</span> <span class="o">=</span> <span class="mi">153</span> <span class="o">+</span> <span class="n">random</span><span class="o">.</span><span class="na">nextInt</span><span class="o">(</span><span class="mi">102</span><span class="o">);</span>
+    <span class="o">}</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+<p>想让粒子运动起来，使用update更新粒子的这些坐标属性就能实现，比如粒子现在坐标在(5,5)，通过update()改变粒子的坐标到(6,6),结合属性动画不停地调用update()则就能不停的改变x,y的坐标，实现粒子运动，然后当粒子移动超过一定距离，或者调用update超过一定次数，再重新调用init()让粒子重新从圆周上开始下一个生命周期运动</p>
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><!-- <td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td> --><td class="rouge-code"><pre><span class="kd">public</span> <span class="kt">void</span> <span class="nf">updatePoint</span><span class="o">(</span><span class="nc">Random</span> <span class="n">random</span><span class="o">,</span> <span class="kt">float</span> <span class="n">viewRadius</span><span class="o">)</span> <span class="o">{</span>
+        <span class="c1">//每一帧偏移的像素大小</span>
+        <span class="kt">float</span> <span class="n">distance</span> <span class="o">=</span> <span class="mi">1</span><span class="no">F</span><span class="o">;</span>
+        <span class="kt">double</span> <span class="n">moveAnger</span> <span class="o">=</span> <span class="n">anger</span> <span class="o">+</span> <span class="n">randomAnger</span><span class="o">;</span>
+        <span class="n">mX</span> <span class="o">=</span> <span class="o">(</span><span class="kt">float</span><span class="o">)</span> <span class="o">(</span><span class="n">mX</span> <span class="o">-</span> <span class="n">distance</span> <span class="o">*</span> <span class="nc">Math</span><span class="o">.</span><span class="na">cos</span><span class="o">(</span><span class="n">moveAnger</span><span class="o">)</span> <span class="o">*</span> <span class="n">velocity</span><span class="o">);</span>
+        <span class="n">mY</span> <span class="o">=</span> <span class="o">(</span><span class="kt">float</span><span class="o">)</span> <span class="o">(</span><span class="n">mY</span> <span class="o">-</span> <span class="n">distance</span> <span class="o">*</span> <span class="nc">Math</span><span class="o">.</span><span class="na">sin</span><span class="o">(</span><span class="n">moveAnger</span><span class="o">)</span> <span class="o">*</span> <span class="n">velocity</span><span class="o">);</span>
+        <span class="c1">//模拟半径逐渐变小</span>
+        <span class="n">radius</span> <span class="o">=</span> <span class="n">radius</span> <span class="o">-</span> <span class="mf">0.02</span><span class="no">F</span> <span class="o">*</span> <span class="n">velocity</span><span class="o">;</span>
+        <span class="n">num</span><span class="o">++;</span>
+        <span class="c1">//如果到了最大值 则重新给运动粒子一个轨迹属性</span>
+        <span class="kt">int</span> <span class="n">maxDistance</span> <span class="o">=</span> <span class="mi">180</span><span class="o">;</span>
+        <span class="kt">int</span> <span class="n">maxNum</span> <span class="o">=</span> <span class="mi">400</span><span class="o">;</span>
+        <span class="k">if</span> <span class="o">(</span><span class="n">velocity</span> <span class="o">*</span> <span class="n">num</span> <span class="o">&gt;</span> <span class="n">maxDistance</span> <span class="o">||</span> <span class="n">num</span> <span class="o">&gt;</span> <span class="n">maxNum</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">num</span> <span class="o">=</span> <span class="mi">0</span><span class="o">;</span>
+            <span class="n">init</span><span class="o">(</span><span class="n">random</span><span class="o">,</span> <span class="n">viewRadius</span><span class="o">);</span>
+        <span class="o">}</span>
+    <span class="o">}</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+<p>在View中大致实现如下</p>
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><!-- <td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+39
+40
+41
+</pre></td> --><td class="rouge-code"><pre><span class="cm">/**
+     * 初始化动画
+     */</span>
+    <span class="kd">private</span> <span class="kt">void</span> <span class="nf">initAnim</span><span class="o">()</span> <span class="o">{</span>
+        <span class="c1">//绘制运动的粒子</span>
+        <span class="nc">AnimPoint</span> <span class="n">mAnimPoint</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">AnimPoint</span><span class="o">();</span>
+        <span class="k">for</span> <span class="o">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="o">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">pointCount</span><span class="o">;</span> <span class="n">i</span><span class="o">++)</span> <span class="o">{</span>
+            <span class="c1">//通过clone创建对象，避免重复创建</span>
+            <span class="nc">AnimPoint</span> <span class="n">cloneAnimPoint</span> <span class="o">=</span> <span class="n">mAnimPoint</span><span class="o">.</span><span class="na">clone</span><span class="o">();</span>
+            <span class="c1">//先给每个粒子初始化各类属性</span>
+            <span class="n">cloneAnimPoint</span><span class="o">.</span><span class="na">init</span><span class="o">(</span><span class="n">mRandom</span><span class="o">,</span> <span class="n">mRadius</span> <span class="o">-</span> <span class="n">mOutCircleStrokeWidth</span> <span class="o">/</span> <span class="mi">2</span><span class="no">F</span><span class="o">);</span>
+            <span class="n">mPointList</span><span class="o">.</span><span class="na">add</span><span class="o">(</span><span class="n">cloneAnimPoint</span><span class="o">);</span>
+        <span class="o">}</span>
+        <span class="c1">//画运动粒子</span>
+        <span class="n">mPointsAnimator</span> <span class="o">=</span> <span class="nc">ValueAnimator</span><span class="o">.</span><span class="na">ofFloat</span><span class="o">(</span><span class="mi">0</span><span class="no">F</span><span class="o">,</span> <span class="mi">1</span><span class="no">F</span><span class="o">);</span>
+        <span class="n">mPointsAnimator</span><span class="o">.</span><span class="na">setDuration</span><span class="o">(</span><span class="nc">Integer</span><span class="o">.</span><span class="na">MAX_VALUE</span><span class="o">);</span>
+        <span class="n">mPointsAnimator</span><span class="o">.</span><span class="na">setRepeatMode</span><span class="o">(</span><span class="nc">ValueAnimator</span><span class="o">.</span><span class="na">RESTART</span><span class="o">);</span>
+        <span class="n">mPointsAnimator</span><span class="o">.</span><span class="na">setRepeatCount</span><span class="o">(</span><span class="nc">ValueAnimator</span><span class="o">.</span><span class="na">INFINITE</span><span class="o">);</span>
+        <span class="n">mPointsAnimator</span><span class="o">.</span><span class="na">addUpdateListener</span><span class="o">(</span><span class="n">animation</span> <span class="o">-&gt;</span> <span class="o">{</span>
+            <span class="k">for</span> <span class="o">(</span><span class="nc">AnimPoint</span> <span class="n">point</span> <span class="o">:</span> <span class="n">mPointList</span><span class="o">)</span> <span class="o">{</span>
+                <span class="c1">//通过属性动画不停的计算下粒子的下一个坐标</span>
+                <span class="n">point</span><span class="o">.</span><span class="na">updatePoint</span><span class="o">(</span><span class="n">mRandom</span><span class="o">,</span> <span class="n">mRadius</span><span class="o">);</span>
+            <span class="o">}</span>
+            <span class="n">invalidate</span><span class="o">();</span>
+        <span class="o">});</span>
+        <span class="n">mPointsAnimator</span><span class="o">.</span><span class="na">start</span><span class="o">();</span>
+    <span class="o">}</span>
+
+
+    <span class="nd">@Override</span>
+    <span class="kd">protected</span> <span class="kt">void</span> <span class="nf">onDraw</span><span class="o">(</span><span class="kd">final</span> <span class="nc">Canvas</span> <span class="n">canvas</span><span class="o">)</span> <span class="o">{</span>
+        <span class="kd">super</span><span class="o">.</span><span class="na">onDraw</span><span class="o">(</span><span class="n">canvas</span><span class="o">);</span>
+        <span class="n">canvas</span><span class="o">.</span><span class="na">save</span><span class="o">();</span>
+        <span class="n">canvas</span><span class="o">.</span><span class="na">translate</span><span class="o">(</span><span class="n">mCenterX</span><span class="o">,</span> <span class="n">mCenterY</span><span class="o">);</span>
+        <span class="c1">//画运动粒子</span>
+        <span class="k">for</span> <span class="o">(</span><span class="nc">AnimPoint</span> <span class="n">animPoint</span> <span class="o">:</span> <span class="n">mPointList</span><span class="o">)</span> <span class="o">{</span>
+            <span class="n">mPointPaint</span><span class="o">.</span><span class="na">setAlpha</span><span class="o">(</span><span class="n">animPoint</span><span class="o">.</span><span class="na">getAlpha</span><span class="o">());</span>
+            <span class="n">canvas</span><span class="o">.</span><span class="na">drawCircle</span><span class="o">(</span><span class="n">animPoint</span><span class="o">.</span><span class="na">getmX</span><span class="o">(),</span> <span class="n">animPoint</span><span class="o">.</span><span class="na">getmY</span><span class="o">(),</span>
+                    <span class="n">animPoint</span><span class="o">.</span><span class="na">getRadius</span><span class="o">(),</span> <span class="n">mPointPaint</span><span class="o">);</span>
+        <span class="o">}</span>
+     <span class="o">}</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+
+<h4 id="22实现渐变色圆">2.2、实现渐变色圆</h4>
+<p>实现圆从内到外渐变使用RadialGradient
+大致实现方式如下</p>
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><!-- <td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+</pre></td> --><td class="rouge-code"><pre><span class="kt">float</span><span class="o">[]</span> <span class="n">mRadialGradientStops</span> <span class="o">=</span> <span class="o">{</span><span class="mi">0</span><span class="no">F</span><span class="o">,</span> <span class="mf">0.69</span><span class="no">F</span><span class="o">,</span> <span class="mf">0.86</span><span class="no">F</span><span class="o">,</span> <span class="mf">0.94</span><span class="no">F</span><span class="o">,</span> <span class="mf">0.98</span><span class="no">F</span><span class="o">,</span> <span class="mi">1</span><span class="no">F</span><span class="o">};</span>
+<span class="n">mRadialGradientColors</span><span class="o">[</span><span class="mi">0</span><span class="o">]</span> <span class="o">=</span> <span class="n">transparentColor</span><span class="o">;</span>
+<span class="n">mRadialGradientColors</span><span class="o">[</span><span class="mi">1</span><span class="o">]</span> <span class="o">=</span> <span class="n">transparentColor</span><span class="o">;</span>
+<span class="n">mRadialGradientColors</span><span class="o">[</span><span class="mi">2</span><span class="o">]</span> <span class="o">=</span> <span class="n">parameter</span><span class="o">.</span><span class="na">getInsideColor</span><span class="o">();</span>
+<span class="n">mRadialGradientColors</span><span class="o">[</span><span class="mi">3</span><span class="o">]</span> <span class="o">=</span> <span class="n">parameter</span><span class="o">.</span><span class="na">getOutsizeColor</span><span class="o">();</span>
+<span class="n">mRadialGradientColors</span><span class="o">[</span><span class="mi">4</span><span class="o">]</span> <span class="o">=</span> <span class="n">transparentColor</span><span class="o">;</span>
+<span class="n">mRadialGradientColors</span><span class="o">[</span><span class="mi">5</span><span class="o">]</span> <span class="o">=</span> <span class="n">transparentColor</span><span class="o">;</span>
+<span class="n">mRadialGradient</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">RadialGradient</span><span class="o">(</span>
+                    <span class="mi">0</span><span class="o">,</span>
+                    <span class="mi">0</span><span class="o">,</span>
+                    <span class="n">mCenterX</span><span class="o">,</span>
+                    <span class="n">mRadialGradientColors</span><span class="o">,</span>
+                    <span class="n">mRadialGradientStops</span><span class="o">,</span>
+                    <span class="nc">Shader</span><span class="o">.</span><span class="na">TileMode</span><span class="o">.</span><span class="na">CLAMP</span><span class="o">);</span>
+<span class="n">mSweptPaint</span><span class="o">.</span><span class="na">setShader</span><span class="o">(</span><span class="n">mRadialGradient</span><span class="o">);</span>
+
+<span class="o">...</span>
+<span class="c1">//onDraw()绘制</span>
+<span class="n">canvas</span><span class="o">.</span><span class="na">drawCircle</span><span class="o">(</span><span class="mi">0</span><span class="o">,</span> <span class="mi">0</span><span class="o">,</span> <span class="n">mCenterX</span><span class="o">,</span> <span class="n">mSweptPaint</span><span class="o">);</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+<h4 id="23展示背景圆的扇形区域">2.3、展示背景圆的扇形区域</h4>
+<p>原本想通过DrawArc实现这个效果，但是DrawArc无法实现到圆心的区域
+那么如何实现这么一个不规则的形状呢，可以使用canvas.clipPath()实现裁剪不规则的形状，所以只要得到扇形的Path就能实现，通过圆点+弧形再闭合path就能实现
+<img src="https://upload-images.jianshu.io/upload_images/7312294-922e29e5a760f2e1.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="获取弧形path" /></p>
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><!-- <td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+</pre></td> --><td class="rouge-code"><pre><span class="cm">/**
+     * 绘制扇形path
+     *
+     * @param r 半径
+     * @param startAngle 开始角度
+     * @param sweepAngle 扫过的角度
+     */</span>
+<span class="kd">private</span> <span class="kt">void</span> <span class="nf">getSectorClip</span><span class="o">(</span><span class="kt">float</span> <span class="n">r</span><span class="o">,</span> <span class="kt">float</span> <span class="n">startAngle</span><span class="o">,</span> <span class="kt">float</span> <span class="n">sweepAngle</span><span class="o">)</span> <span class="o">{</span>
+        <span class="n">mArcPath</span><span class="o">.</span><span class="na">reset</span><span class="o">();</span>
+        <span class="n">mArcPath</span><span class="o">.</span><span class="na">addArc</span><span class="o">(-</span><span class="n">r</span><span class="o">,</span> <span class="o">-</span><span class="n">r</span><span class="o">,</span> <span class="n">r</span><span class="o">,</span> <span class="n">r</span><span class="o">,</span> <span class="n">startAngle</span><span class="o">,</span> <span class="n">sweepAngle</span><span class="o">);</span>
+        <span class="n">mArcPath</span><span class="o">.</span><span class="na">lineTo</span><span class="o">(</span><span class="mi">0</span><span class="o">,</span> <span class="mi">0</span><span class="o">);</span>
+        <span class="n">mArcPath</span><span class="o">.</span><span class="na">close</span><span class="o">();</span>
+    <span class="o">}</span>
+
+<span class="c1">//然后再onDraw()中，裁剪画布</span>
+ <span class="n">canvas</span><span class="o">.</span><span class="na">clipPath</span><span class="o">(</span><span class="n">mArcPath</span><span class="o">);</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+<h4 id="24实现指针变色">2.4、实现指针变色</h4>
+<p>指针是不规则形状，无法通过绘制几何图形实现，所以选用drawBitmap实现
+至于如何实现bitmap指针图片的颜色变化呢，原本的方案是使用AvoidXfermode改变指定像素通道范围内的颜色，但是AvoidXfermode在API 24已经被移除，所以这方案无效
+最终采用图层混合模式实现指针图片变色
+<img src="https://upload-images.jianshu.io/upload_images/7312294-6fc17b4997a56812.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240" alt="16种图层混合模式" />
+通过PorterDuff.Mode.MULTIPLY模式可以实现bitmap颜色，源图像为要修改的指针颜色，目标图像为白色指针，通过获取两个图像的重叠部分实现变色
+大致实现如下</p>
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><!-- <td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+</pre></td> --><td class="rouge-code"><pre><span class="cm">/**
+     * 初始化指针图片的Bitmap
+     */</span>
+    <span class="kd">private</span> <span class="kt">void</span> <span class="nf">initBitmap</span><span class="o">()</span> <span class="o">{</span>
+        <span class="kt">float</span> <span class="n">f</span> <span class="o">=</span> <span class="mi">130</span><span class="no">F</span> <span class="o">/</span> <span class="mi">656</span><span class="no">F</span><span class="o">;</span>
+        <span class="n">mBitmapDST</span> <span class="o">=</span> <span class="nc">BitmapFactory</span><span class="o">.</span><span class="na">decodeResource</span><span class="o">(</span><span class="n">getResources</span><span class="o">(),</span> <span class="no">R</span><span class="o">.</span><span class="na">drawable</span><span class="o">.</span><span class="na">indicator</span><span class="o">);</span>
+        <span class="kt">float</span> <span class="n">mBitmapDstHeight</span> <span class="o">=</span> <span class="n">width</span> <span class="o">*</span> <span class="n">f</span><span class="o">;</span>
+        <span class="kt">float</span> <span class="n">mBitmapDstWidth</span> <span class="o">=</span> <span class="n">mBitmapDstHeight</span> <span class="o">*</span> <span class="n">mBitmapDST</span><span class="o">.</span><span class="na">getWidth</span><span class="o">()</span> <span class="o">/</span> <span class="n">mBitmapDST</span><span class="o">.</span><span class="na">getHeight</span><span class="o">();</span>
+        <span class="c1">//初始化指针的图层混合模式</span>
+        <span class="n">mXfermode</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">PorterDuffXfermode</span><span class="o">(</span><span class="nc">PorterDuff</span><span class="o">.</span><span class="na">Mode</span><span class="o">.</span><span class="na">MULTIPLY</span><span class="o">);</span>
+        <span class="n">mPointerRectF</span> <span class="o">=</span> <span class="k">new</span> <span class="nc">RectF</span><span class="o">(</span><span class="mi">0</span><span class="o">,</span> <span class="mi">0</span><span class="o">,</span> <span class="n">mBitmapDstWidth</span><span class="o">,</span> <span class="n">mBitmapDstHeight</span><span class="o">);</span>
+        <span class="n">mBitmapSRT</span> <span class="o">=</span> <span class="nc">Bitmap</span><span class="o">.</span><span class="na">createBitmap</span><span class="o">((</span><span class="kt">int</span><span class="o">)</span> <span class="n">mBitmapDstWidth</span><span class="o">,</span> <span class="o">(</span><span class="kt">int</span><span class="o">)</span> <span class="n">mBitmapDstHeight</span><span class="o">,</span> <span class="nc">Bitmap</span><span class="o">.</span><span class="na">Config</span><span class="o">.</span><span class="na">ARGB_8888</span><span class="o">);</span>
+        <span class="n">mBitmapSRT</span><span class="o">.</span><span class="na">eraseColor</span><span class="o">(</span><span class="n">mIndicatorColor</span><span class="o">);</span>
+    <span class="o">}</span>
+
+    <span class="nd">@Override</span>
+    <span class="kd">protected</span> <span class="kt">void</span> <span class="nf">onDraw</span><span class="o">(</span><span class="kd">final</span> <span class="nc">Canvas</span> <span class="n">canvas</span><span class="o">)</span> <span class="o">{</span>
+        <span class="kd">super</span><span class="o">.</span><span class="na">onDraw</span><span class="o">(</span><span class="n">canvas</span><span class="o">);</span>
+        <span class="c1">//画指针</span>
+       <span class="n">canvas</span><span class="o">.</span><span class="na">translate</span><span class="o">(</span><span class="n">mCenterX</span><span class="o">,</span> <span class="n">mCenterY</span><span class="o">);</span>
+       <span class="n">canvas</span><span class="o">.</span><span class="na">rotate</span><span class="o">(</span><span class="n">mCurrentAngle</span> <span class="o">/</span> <span class="mi">10</span><span class="no">F</span><span class="o">);</span>
+       <span class="n">canvas</span><span class="o">.</span><span class="na">translate</span><span class="o">(-</span><span class="n">mPointerRectF</span><span class="o">.</span><span class="na">width</span><span class="o">()</span> <span class="o">/</span> <span class="mi">2</span><span class="o">,</span> <span class="o">-</span><span class="n">mCenterY</span><span class="o">);</span>
+       <span class="n">mPointerLayoutId</span> <span class="o">=</span> <span class="n">canvas</span><span class="o">.</span><span class="na">saveLayer</span><span class="o">(</span><span class="n">mPointerRectF</span><span class="o">,</span> <span class="n">mBmpPaint</span><span class="o">);</span>
+       <span class="n">mBitmapSRT</span><span class="o">.</span><span class="na">eraseColor</span><span class="o">(</span><span class="n">mIndicatorColor</span><span class="o">);</span>
+       <span class="n">canvas</span><span class="o">.</span><span class="na">drawBitmap</span><span class="o">(</span><span class="n">mBitmapDST</span><span class="o">,</span> <span class="kc">null</span><span class="o">,</span> <span class="n">mPointerRectF</span><span class="o">,</span> <span class="n">mBmpPaint</span><span class="o">);</span>
+       <span class="n">mBmpPaint</span><span class="o">.</span><span class="na">setXfermode</span><span class="o">(</span><span class="n">mXfermode</span><span class="o">);</span>
+       <span class="n">canvas</span><span class="o">.</span><span class="na">drawBitmap</span><span class="o">(</span><span class="n">mBitmapSRT</span><span class="o">,</span> <span class="kc">null</span><span class="o">,</span> <span class="n">mPointerRectF</span><span class="o">,</span> <span class="n">mBmpPaint</span><span class="o">);</span>
+       <span class="n">mBmpPaint</span><span class="o">.</span><span class="na">setXfermode</span><span class="o">(</span><span class="kc">null</span><span class="o">);</span>
+       <span class="n">canvas</span><span class="o">.</span><span class="na">restoreToCount</span><span class="o">(</span><span class="n">mPointerLayoutId</span><span class="o">);</span>
+    <span class="o">}</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+<h4 id="25实现背景圆颜色随扇形角度变化">2.5、实现背景圆颜色随扇形角度变化</h4>
+<p>把圆形控件拆成3600°，每一个角度对应控件一种具体颜色值，那么如何计算特定角度他具体的颜色值呢？
+参考属性动画中的变色动画android.animation.ArgbEvaluator实现方式，计算两个颜色中具体某一个点的颜色值方式如下</p>
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><!-- <td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+</pre></td> --><td class="rouge-code"><pre><span class="kd">public</span> <span class="nc">Object</span> <span class="nf">evaluate</span><span class="o">(</span><span class="kt">float</span> <span class="n">fraction</span><span class="o">,</span> <span class="nc">Object</span> <span class="n">startValue</span><span class="o">,</span> <span class="nc">Object</span> <span class="n">endValue</span><span class="o">)</span> <span class="o">{</span>
+        <span class="kt">int</span> <span class="n">startInt</span> <span class="o">=</span> <span class="o">(</span><span class="nc">Integer</span><span class="o">)</span> <span class="n">startValue</span><span class="o">;</span>
+        <span class="kt">float</span> <span class="n">startA</span> <span class="o">=</span> <span class="o">((</span><span class="n">startInt</span> <span class="o">&gt;&gt;</span> <span class="mi">24</span><span class="o">)</span> <span class="o">&amp;</span> <span class="mh">0xff</span><span class="o">)</span> <span class="o">/</span> <span class="mf">255.0f</span><span class="o">;</span>
+        <span class="kt">float</span> <span class="n">startR</span> <span class="o">=</span> <span class="o">((</span><span class="n">startInt</span> <span class="o">&gt;&gt;</span> <span class="mi">16</span><span class="o">)</span> <span class="o">&amp;</span> <span class="mh">0xff</span><span class="o">)</span> <span class="o">/</span> <span class="mf">255.0f</span><span class="o">;</span>
+        <span class="kt">float</span> <span class="n">startG</span> <span class="o">=</span> <span class="o">((</span><span class="n">startInt</span> <span class="o">&gt;&gt;</span>  <span class="mi">8</span><span class="o">)</span> <span class="o">&amp;</span> <span class="mh">0xff</span><span class="o">)</span> <span class="o">/</span> <span class="mf">255.0f</span><span class="o">;</span>
+        <span class="kt">float</span> <span class="n">startB</span> <span class="o">=</span> <span class="o">(</span> <span class="n">startInt</span>        <span class="o">&amp;</span> <span class="mh">0xff</span><span class="o">)</span> <span class="o">/</span> <span class="mf">255.0f</span><span class="o">;</span>
+
+        <span class="kt">int</span> <span class="n">endInt</span> <span class="o">=</span> <span class="o">(</span><span class="nc">Integer</span><span class="o">)</span> <span class="n">endValue</span><span class="o">;</span>
+        <span class="kt">float</span> <span class="n">endA</span> <span class="o">=</span> <span class="o">((</span><span class="n">endInt</span> <span class="o">&gt;&gt;</span> <span class="mi">24</span><span class="o">)</span> <span class="o">&amp;</span> <span class="mh">0xff</span><span class="o">)</span> <span class="o">/</span> <span class="mf">255.0f</span><span class="o">;</span>
+        <span class="kt">float</span> <span class="n">endR</span> <span class="o">=</span> <span class="o">((</span><span class="n">endInt</span> <span class="o">&gt;&gt;</span> <span class="mi">16</span><span class="o">)</span> <span class="o">&amp;</span> <span class="mh">0xff</span><span class="o">)</span> <span class="o">/</span> <span class="mf">255.0f</span><span class="o">;</span>
+        <span class="kt">float</span> <span class="n">endG</span> <span class="o">=</span> <span class="o">((</span><span class="n">endInt</span> <span class="o">&gt;&gt;</span>  <span class="mi">8</span><span class="o">)</span> <span class="o">&amp;</span> <span class="mh">0xff</span><span class="o">)</span> <span class="o">/</span> <span class="mf">255.0f</span><span class="o">;</span>
+        <span class="kt">float</span> <span class="n">endB</span> <span class="o">=</span> <span class="o">(</span> <span class="n">endInt</span>        <span class="o">&amp;</span> <span class="mh">0xff</span><span class="o">)</span> <span class="o">/</span> <span class="mf">255.0f</span><span class="o">;</span>
+
+        <span class="c1">// convert from sRGB to linear</span>
+        <span class="n">startR</span> <span class="o">=</span> <span class="o">(</span><span class="kt">float</span><span class="o">)</span> <span class="nc">Math</span><span class="o">.</span><span class="na">pow</span><span class="o">(</span><span class="n">startR</span><span class="o">,</span> <span class="mf">2.2</span><span class="o">);</span>
+        <span class="n">startG</span> <span class="o">=</span> <span class="o">(</span><span class="kt">float</span><span class="o">)</span> <span class="nc">Math</span><span class="o">.</span><span class="na">pow</span><span class="o">(</span><span class="n">startG</span><span class="o">,</span> <span class="mf">2.2</span><span class="o">);</span>
+        <span class="n">startB</span> <span class="o">=</span> <span class="o">(</span><span class="kt">float</span><span class="o">)</span> <span class="nc">Math</span><span class="o">.</span><span class="na">pow</span><span class="o">(</span><span class="n">startB</span><span class="o">,</span> <span class="mf">2.2</span><span class="o">);</span>
+
+        <span class="n">endR</span> <span class="o">=</span> <span class="o">(</span><span class="kt">float</span><span class="o">)</span> <span class="nc">Math</span><span class="o">.</span><span class="na">pow</span><span class="o">(</span><span class="n">endR</span><span class="o">,</span> <span class="mf">2.2</span><span class="o">);</span>
+        <span class="n">endG</span> <span class="o">=</span> <span class="o">(</span><span class="kt">float</span><span class="o">)</span> <span class="nc">Math</span><span class="o">.</span><span class="na">pow</span><span class="o">(</span><span class="n">endG</span><span class="o">,</span> <span class="mf">2.2</span><span class="o">);</span>
+        <span class="n">endB</span> <span class="o">=</span> <span class="o">(</span><span class="kt">float</span><span class="o">)</span> <span class="nc">Math</span><span class="o">.</span><span class="na">pow</span><span class="o">(</span><span class="n">endB</span><span class="o">,</span> <span class="mf">2.2</span><span class="o">);</span>
+
+        <span class="c1">// compute the interpolated color in linear space</span>
+        <span class="kt">float</span> <span class="n">a</span> <span class="o">=</span> <span class="n">startA</span> <span class="o">+</span> <span class="n">fraction</span> <span class="o">*</span> <span class="o">(</span><span class="n">endA</span> <span class="o">-</span> <span class="n">startA</span><span class="o">);</span>
+        <span class="kt">float</span> <span class="n">r</span> <span class="o">=</span> <span class="n">startR</span> <span class="o">+</span> <span class="n">fraction</span> <span class="o">*</span> <span class="o">(</span><span class="n">endR</span> <span class="o">-</span> <span class="n">startR</span><span class="o">);</span>
+        <span class="kt">float</span> <span class="n">g</span> <span class="o">=</span> <span class="n">startG</span> <span class="o">+</span> <span class="n">fraction</span> <span class="o">*</span> <span class="o">(</span><span class="n">endG</span> <span class="o">-</span> <span class="n">startG</span><span class="o">);</span>
+        <span class="kt">float</span> <span class="n">b</span> <span class="o">=</span> <span class="n">startB</span> <span class="o">+</span> <span class="n">fraction</span> <span class="o">*</span> <span class="o">(</span><span class="n">endB</span> <span class="o">-</span> <span class="n">startB</span><span class="o">);</span>
+
+        <span class="c1">// convert back to sRGB in the [0..255] range</span>
+        <span class="n">a</span> <span class="o">=</span> <span class="n">a</span> <span class="o">*</span> <span class="mf">255.0f</span><span class="o">;</span>
+        <span class="n">r</span> <span class="o">=</span> <span class="o">(</span><span class="kt">float</span><span class="o">)</span> <span class="nc">Math</span><span class="o">.</span><span class="na">pow</span><span class="o">(</span><span class="n">r</span><span class="o">,</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="mf">2.2</span><span class="o">)</span> <span class="o">*</span> <span class="mf">255.0f</span><span class="o">;</span>
+        <span class="n">g</span> <span class="o">=</span> <span class="o">(</span><span class="kt">float</span><span class="o">)</span> <span class="nc">Math</span><span class="o">.</span><span class="na">pow</span><span class="o">(</span><span class="n">g</span><span class="o">,</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="mf">2.2</span><span class="o">)</span> <span class="o">*</span> <span class="mf">255.0f</span><span class="o">;</span>
+        <span class="n">b</span> <span class="o">=</span> <span class="o">(</span><span class="kt">float</span><span class="o">)</span> <span class="nc">Math</span><span class="o">.</span><span class="na">pow</span><span class="o">(</span><span class="n">b</span><span class="o">,</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="mf">2.2</span><span class="o">)</span> <span class="o">*</span> <span class="mf">255.0f</span><span class="o">;</span>
+
+        <span class="k">return</span> <span class="nc">Math</span><span class="o">.</span><span class="na">round</span><span class="o">(</span><span class="n">a</span><span class="o">)</span> <span class="o">&lt;&lt;</span> <span class="mi">24</span> <span class="o">|</span> <span class="nc">Math</span><span class="o">.</span><span class="na">round</span><span class="o">(</span><span class="n">r</span><span class="o">)</span> <span class="o">&lt;&lt;</span> <span class="mi">16</span> <span class="o">|</span> <span class="nc">Math</span><span class="o">.</span><span class="na">round</span><span class="o">(</span><span class="n">g</span><span class="o">)</span> <span class="o">&lt;&lt;</span> <span class="mi">8</span> <span class="o">|</span> <span class="nc">Math</span><span class="o">.</span><span class="na">round</span><span class="o">(</span><span class="n">b</span><span class="o">);</span>
+    <span class="o">}</span>
+
+</pre></td></tr></tbody></table></code></pre></div></div>
+<p>控件中总共有四个颜色段，3600/4=900，所以 fraction = progressValue % 900 / 900;
+然后判断当前的角度位于第几段颜色值中，通过android.animation.ArgbEvaluator.evaluate(float fraction, Object startValue, Object endValue) 就能回去具体的颜色值
+大致实现过程如下</p>
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><!-- <td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+27
+28
+29
+30
+31
+32
+33
+34
+35
+36
+37
+38
+</pre></td> --><td class="rouge-code"><pre><span class="kd">private</span> <span class="nc">ProgressParameter</span> <span class="nf">getProgressParameter</span><span class="o">(</span><span class="kt">float</span> <span class="n">progressValue</span><span class="o">)</span> <span class="o">{</span>
+        <span class="kt">float</span> <span class="n">fraction</span> <span class="o">=</span> <span class="n">progressValue</span> <span class="o">%</span> <span class="mi">900</span> <span class="o">/</span> <span class="mi">900</span><span class="o">;</span>
+        <span class="k">if</span> <span class="o">(</span><span class="n">progressValue</span> <span class="o">&lt;</span> <span class="mi">900</span><span class="o">)</span> <span class="o">{</span>
+            <span class="c1">//第一个颜色段</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setInsideColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">insideColor1</span><span class="o">,</span> <span class="n">insideColor2</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setOutsizeColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">outsizeColor1</span><span class="o">,</span> <span class="n">outsizeColor2</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setProgressColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">progressColor1</span><span class="o">,</span> <span class="n">progressColor2</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setPointColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">pointColor1</span><span class="o">,</span> <span class="n">pointColor2</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setBgCircleColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">bgCircleColor1</span><span class="o">,</span> <span class="n">bgCircleColor2</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setIndicatorColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">indicatorColor1</span><span class="o">,</span> <span class="n">indicatorColor2</span><span class="o">));</span>
+        <span class="o">}</span> <span class="k">else</span> <span class="k">if</span> <span class="o">(</span><span class="n">progressValue</span> <span class="o">&lt;</span> <span class="mi">1800</span><span class="o">)</span> <span class="o">{</span>
+            <span class="c1">//第二个颜色段</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setInsideColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">insideColor2</span><span class="o">,</span> <span class="n">insideColor3</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setOutsizeColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">outsizeColor2</span><span class="o">,</span> <span class="n">outsizeColor3</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setProgressColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">progressColor2</span><span class="o">,</span> <span class="n">progressColor3</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setPointColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">pointColor2</span><span class="o">,</span> <span class="n">pointColor3</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setBgCircleColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">bgCircleColor2</span><span class="o">,</span> <span class="n">bgCircleColor3</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setIndicatorColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">indicatorColor2</span><span class="o">,</span> <span class="n">indicatorColor3</span><span class="o">));</span>
+        <span class="o">}</span> <span class="k">else</span> <span class="k">if</span> <span class="o">(</span><span class="n">progressValue</span> <span class="o">&lt;</span> <span class="mi">2700</span><span class="o">)</span> <span class="o">{</span>
+            <span class="c1">//第三个颜色段</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setInsideColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">insideColor3</span><span class="o">,</span> <span class="n">insideColor4</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setOutsizeColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">outsizeColor3</span><span class="o">,</span> <span class="n">outsizeColor4</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setProgressColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">progressColor3</span><span class="o">,</span> <span class="n">progressColor4</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setPointColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">pointColor3</span><span class="o">,</span> <span class="n">pointColor4</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setBgCircleColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">bgCircleColor3</span><span class="o">,</span> <span class="n">bgCircleColor4</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setIndicatorColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">indicatorColor3</span><span class="o">,</span> <span class="n">indicatorColor4</span><span class="o">));</span>
+        <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
+            <span class="c1">//第四个颜色段</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setInsideColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">insideColor4</span><span class="o">,</span> <span class="n">insideColor5</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setOutsizeColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">outsizeColor4</span><span class="o">,</span> <span class="n">outsizeColor5</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setProgressColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">progressColor4</span><span class="o">,</span> <span class="n">progressColor5</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setPointColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">pointColor4</span><span class="o">,</span> <span class="n">pointColor5</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setBgCircleColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">bgCircleColor4</span><span class="o">,</span> <span class="n">bgCircleColor5</span><span class="o">));</span>
+            <span class="n">mParameter</span><span class="o">.</span><span class="na">setIndicatorColor</span><span class="o">(</span><span class="n">evaluate</span><span class="o">(</span><span class="n">fraction</span><span class="o">,</span> <span class="n">indicatorColor4</span><span class="o">,</span> <span class="n">indicatorColor5</span><span class="o">));</span>
+        <span class="o">}</span>
+        <span class="k">return</span> <span class="n">mParameter</span><span class="o">;</span>
+    <span class="o">}</span>
+
+</pre></td></tr></tbody></table></code></pre></div></div>
+
+<h2 id="三跳动数字动画实现">三、跳动数字动画实现</h2>
+
+<h4 id="31属性动画2个textview实现数字上下切换动画">3.1、属性动画+2个TextView实现数字上下切换动画</h4>
+<p>实现数字切换动画，原本打算用RecycleView实现，但是考虑到动效上将来可能面临UI小姐姐各种骚操作，所以最终决定就用两个TextView做上下translation动画，这样可控性高，对View执行属性动画也简单</p>
+
+<p>NumberView使用FrameLayout包裹两个TextView，widget_progress_number_item_layout.xml</p>
+<div class="language-xml highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><!-- <td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+18
+19
+20
+21
+22
+23
+24
+25
+26
+</pre></td> --><td class="rouge-code"><pre><span class="cp">&lt;?xml version="1.0" encoding="utf-8"?&gt;</span>
+<span class="nt">&lt;FrameLayout</span> <span class="na">xmlns:android=</span><span class="s">"http://schemas.android.com/apk/res/android"</span>
+    <span class="na">android:layout_width=</span><span class="s">"wrap_content"</span>
+    <span class="na">android:layout_height=</span><span class="s">"wrap_content"</span><span class="nt">&gt;</span>
+
+    <span class="nt">&lt;TextView</span>
+        <span class="na">android:id=</span><span class="s">"@+id/tv_number_one"</span>
+        <span class="na">style=</span><span class="s">"@style/progress_text_font"</span>
+        <span class="na">android:layout_width=</span><span class="s">"wrap_content"</span>
+        <span class="na">android:layout_height=</span><span class="s">"wrap_content"</span>
+        <span class="na">android:layout_gravity=</span><span class="s">"center"</span>
+        <span class="na">android:gravity=</span><span class="s">"center"</span>
+        <span class="na">android:padding=</span><span class="s">"0dp"</span>
+        <span class="na">android:text=</span><span class="s">"0"</span>
+        <span class="na">android:textColor=</span><span class="s">"@android:color/white"</span> <span class="nt">/&gt;</span>
+
+    <span class="nt">&lt;TextView</span>
+        <span class="na">style=</span><span class="s">"@style/progress_text_font"</span>
+        <span class="na">android:id=</span><span class="s">"@+id/tv_number_tow"</span>
+        <span class="na">android:layout_width=</span><span class="s">"wrap_content"</span>
+        <span class="na">android:layout_height=</span><span class="s">"wrap_content"</span>
+        <span class="na">android:layout_gravity=</span><span class="s">"center"</span>
+        <span class="na">android:gravity=</span><span class="s">"center"</span>
+        <span class="na">android:text=</span><span class="s">"1"</span>
+        <span class="na">android:textColor=</span><span class="s">"@android:color/white"</span> <span class="nt">/&gt;</span>
+<span class="nt">&lt;/FrameLayout&gt;</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+<p>然后通过属性动画控制两个TextView上下切换</p>
+<div class="language-java highlighter-rouge"><div class="highlight"><pre class="highlight"><code><table class="rouge-table"><tbody><tr><!-- <td class="rouge-gutter gl"><pre class="lineno">1
+2
+3
+4
+5
+6
+7
+8
+9
+10
+11
+12
+13
+14
+15
+16
+17
+</pre></td> --><td class="rouge-code"><pre><span class="n">mNumberAnim</span> <span class="o">=</span> <span class="nc">ValueAnimator</span><span class="o">.</span><span class="na">ofFloat</span><span class="o">(</span><span class="mi">0</span><span class="no">F</span><span class="o">,</span> <span class="mi">1</span><span class="no">F</span><span class="o">);</span>
+        <span class="n">mNumberAnim</span><span class="o">.</span><span class="na">setDuration</span><span class="o">(</span><span class="mi">400</span><span class="o">);</span>
+        <span class="n">mNumberAnim</span><span class="o">.</span><span class="na">setInterpolator</span><span class="o">(</span><span class="k">new</span> <span class="nc">OvershootInterpolator</span><span class="o">());</span>
+        <span class="n">mNumberAnim</span><span class="o">.</span><span class="na">setRepeatCount</span><span class="o">(</span><span class="mi">0</span><span class="o">);</span>
+        <span class="n">mNumberAnim</span><span class="o">.</span><span class="na">setRepeatMode</span><span class="o">(</span><span class="nc">ValueAnimator</span><span class="o">.</span><span class="na">RESTART</span><span class="o">);</span>
+        <span class="n">mNumberAnim</span><span class="o">.</span><span class="na">addUpdateListener</span><span class="o">(</span><span class="n">animation</span> <span class="o">-&gt;</span> <span class="o">{</span>
+            <span class="kt">float</span> <span class="n">value</span> <span class="o">=</span> <span class="o">(</span><span class="kt">float</span><span class="o">)</span> <span class="n">animation</span><span class="o">.</span><span class="na">getAnimatedValue</span><span class="o">();</span>
+            <span class="k">if</span> <span class="o">(</span><span class="no">UP_OR_DOWN_MODE</span> <span class="o">==</span> <span class="no">UP_ANIMATOR_MODE</span><span class="o">)</span> <span class="o">{</span>
+                <span class="c1">//数字变大，向下移动</span>
+                <span class="n">mTvFirst</span><span class="o">.</span><span class="na">setTranslationY</span><span class="o">(-</span><span class="n">mHeight</span> <span class="o">*</span> <span class="n">value</span><span class="o">);</span>
+                <span class="n">mTvSecond</span><span class="o">.</span><span class="na">setTranslationY</span><span class="o">(-</span><span class="n">mHeight</span> <span class="o">*</span> <span class="n">value</span><span class="o">);</span>
+            <span class="o">}</span> <span class="k">else</span> <span class="o">{</span>
+                <span class="c1">//数字变小，向上移动</span>
+                <span class="n">mTvFirst</span><span class="o">.</span><span class="na">setTranslationY</span><span class="o">(</span><span class="n">mHeight</span> <span class="o">*</span> <span class="n">value</span><span class="o">);</span>
+                <span class="n">mTvSecond</span><span class="o">.</span><span class="na">setTranslationY</span><span class="o">(-</span><span class="mi">2</span> <span class="o">*</span> <span class="n">mHeight</span> <span class="o">+</span> <span class="n">mHeight</span> <span class="o">*</span> <span class="n">value</span><span class="o">);</span>
+            <span class="o">}</span>
+        <span class="o">});</span>
+</pre></td></tr></tbody></table></code></pre></div></div>
+<p>这样NumberView就能实现一位数字的变化是上下切换动画，具有个十百位还有时钟冒号的通过容器布局AnimNumberView组合布局的方式实现表示时间和个十百位数</p>
+
+<h2 id="四项目源码">四、项目源码</h2>
+<p>博客只是大致讲了实现思路，具体实现请阅读源码
+<a href="https://github.com/DaLeiGe/AndroidSamples/tree/master/ProgressView">https://github.com/DaLeiGe/AndroidSamples/tree/master/ProgressView</a></p>
+
+<p><a href="[https://www.jianshu.com/p/c21fa3ecda25">本文为博主原创，转载请注明出处</a></p>
+
+:ET

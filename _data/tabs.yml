@@ -9,6 +9,11 @@
   name: 主页
   icon: "fas fa-home"
 -
+  name: 归档
+  path: tabs
+  url: archives
+  icon: "fas fa-archive"
+-
   name: 分类
   icon: "fas fa-stream"
   path: tabs
@@ -18,11 +23,6 @@
   icon: "fas fa-tags"
   path: tabs
   url: tags
--
-  name: 归档
-  path: tabs
-  url: archives
-  icon: "fas fa-archive"
 -
   name: 关于
   icon: "fas fa-info"
