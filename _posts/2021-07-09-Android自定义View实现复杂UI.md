@@ -202,7 +202,9 @@ private void getSectorClip(float r, float startAngle, float sweepAngle) {
 指针是不规则形状，无法通过绘制几何图形实现，所以选用drawBitmap实现
 至于如何实现bitmap指针图片的颜色变化呢，原本的方案是使用AvoidXfermode改变指定像素通道范围内的颜色，但是AvoidXfermode在API 24已经被移除，所以这方案无效
 最终采用图层混合模式实现指针图片变色
+
 ![16种图层混合模式](https://upload-images.jianshu.io/upload_images/7312294-6fc17b4997a56812.png?imageMogr2/auto-orient/strip%7CimageView2/2/w/1240)
+
 通过PorterDuff.Mode.MULTIPLY模式可以实现bitmap颜色，源图像为要修改的指针颜色，目标图像为白色指针，通过获取两个图像的重叠部分实现变色
 大致实现如下
 ```java
